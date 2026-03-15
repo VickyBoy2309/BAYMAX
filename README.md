@@ -1,17 +1,11 @@
-<table width="100%">
-<tr>
-<td align="left">
+<p>
+  <span style="font-size:40px; font-weight:bold;">BAYMAX</span>
+  <span style="float:right;">
+    <img src="https://img.shields.io/badge/Project-Active-success"/>
+  </span>
+</p>
 
-# BAYMAX
-
-</td>
-<td align="right">
-
-![Status](https://img.shields.io/badge/Project-Active-success)
-
-</td>
-</tr>
-</table>
+<hr>
 
 
 ### Your Personal AI Care Taker
