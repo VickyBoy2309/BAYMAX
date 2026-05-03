@@ -1,16 +1,14 @@
-const jwt = require('jsonwebtoken');
-const User = require('../models/User');
-const DoctorProfile = require('../models/DoctorProfile');
+const jwt = require("jsonwebtoken");
+const User = require("../models/User");
+const DoctorProfile = require("../models/DoctorProfile");
 
 /**
  * Generate JWT Token
  */
 const generateToken = (id) => {
-  return jwt.sign(
-    { id },
-    process.env.JWT_SECRET || 'fallback_secret',
-    { expiresIn: '30d' }
-  );
+  return jwt.sign({ id }, process.env.JWT_SECRET || "fallback_secret", {
+    expiresIn: "30d",
+  });
 };
 
 /**
@@ -27,17 +25,17 @@ exports.register = async (req, res) => {
       role,
       specialization,
       experience,
-      hospital
+      hospital,
     } = req.body;
 
     // Check if user already exists
     const existingUser = await User.findOne({ email });
     if (existingUser) {
-      return res.status(400).json({ message: 'User already exists' });
+      return res.status(400).json({ message: "User already exists" });
     }
 
     // Auto-approve patients & admins
-    const isApproved = role === 'patient' || role === 'admin';
+    const isApproved = role === "patient" || role === "admin";
 
     // Create user
     const user = await User.create({
@@ -45,17 +43,18 @@ exports.register = async (req, res) => {
       email,
       password,
       role,
-      isApproved
+      isApproved,
     });
 
     // If role is doctor, create doctor profile
-    if (role === 'doctor') {
+    if (role === "doctor") {
       await DoctorProfile.create({
         user: user._id,
         specialization,
         experience,
         hospital,
-        address: 'Maduravoyal, Chennai' // As per your requirement
+        address: "Maduravoyal, Chennai", // As per your requirement
+        isApproved: false,
       });
     }
 
@@ -66,15 +65,13 @@ exports.register = async (req, res) => {
       email: user.email,
       role: user.role,
       isApproved: user.isApproved,
-      token: generateToken(user._id)
+      token: generateToken(user._id),
     });
-
   } catch (error) {
-    console.error('Register Error:', error.message);
-    return res.status(500).json({ message: 'Server Error' });
+    console.error("🔥 FULL ERROR STACK:\n", error.stack); // VERY IMPORTANT
+    return res.status(500).json({ message: error.message });
   }
 };
-
 
 /**
  * @desc    Login user
@@ -89,18 +86,18 @@ exports.login = async (req, res) => {
      * Hardcoded Admin Login (Keeping your logic unchanged)
      */
     if (
-      (email === 'admin' || email === 'admin@baymax.com') &&
-      password === 'admin@baymax'
+      (email === "admin" || email === "admin@baymax.com") &&
+      password === "admin@baymax"
     ) {
-      let adminUser = await User.findOne({ role: 'admin' });
+      let adminUser = await User.findOne({ role: "admin" });
 
       if (!adminUser) {
         adminUser = await User.create({
-          name: 'Admin',
-          email: 'admin@baymax.com',
-          password: 'admin@baymax',
-          role: 'admin',
-          isApproved: true
+          name: "Admin",
+          email: "admin@baymax.com",
+          password: "admin@baymax",
+          role: "admin",
+          isApproved: true,
         });
       }
 
@@ -110,7 +107,7 @@ exports.login = async (req, res) => {
         email: adminUser.email,
         role: adminUser.role,
         isApproved: adminUser.isApproved,
-        token: generateToken(adminUser._id)
+        token: generateToken(adminUser._id),
       });
     }
 
@@ -118,11 +115,10 @@ exports.login = async (req, res) => {
     const user = await User.findOne({ email });
 
     if (user && (await user.matchPassword(password))) {
-
       // Doctor approval check
-      if (user.role === 'doctor' && !user.isApproved) {
+      if (user.role === "doctor" && !user.isApproved) {
         return res.status(403).json({
-          message: 'Your account is pending admin approval.'
+          message: "Your account is pending admin approval.",
         });
       }
 
@@ -132,17 +128,15 @@ exports.login = async (req, res) => {
         email: user.email,
         role: user.role,
         isApproved: user.isApproved,
-        token: generateToken(user._id)
+        token: generateToken(user._id),
       });
-
     } else {
       return res.status(401).json({
-        message: 'Invalid email or password'
+        message: "Invalid email or password",
       });
     }
-
   } catch (error) {
-    console.error('Login Error:', error.message);
-    return res.status(500).json({ message: 'Server Error' });
+    console.error("Login Error:", error.message);
+    return res.status(500).json({ message: "Server Error" });
   }
 };

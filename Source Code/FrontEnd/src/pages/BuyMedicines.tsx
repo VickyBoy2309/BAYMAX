@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from "react";
 import axios from "axios";
 import { useNavigate } from "react-router-dom";
-import api from "../services/api";
 import { ArrowLeft, Search, Pill, Plus } from "lucide-react";
 
 export default function BuyMedicines() {
@@ -9,6 +8,8 @@ export default function BuyMedicines() {
   const [filtered, setFiltered] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
+  const [cart, setCart] = useState<any[]>([]);
+  const [prescriptionFile, setPrescriptionFile] = useState<File | null>(null);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -16,37 +17,89 @@ export default function BuyMedicines() {
   }, []);
 
   useEffect(() => {
-    if (search.trim() === "") {
-      setFiltered(medicines);
-    } else {
-      const filteredData = medicines.filter((med) =>
-        med.name.toLowerCase().includes(search.toLowerCase())
-      );
-      setFiltered(filteredData);
-    }
+    setFiltered(
+      search.trim() === ""
+        ? medicines
+        : medicines.filter((m) =>
+            m.name.toLowerCase().includes(search.toLowerCase()),
+          ),
+    );
   }, [search, medicines]);
 
-const fetchMedicines = async () => {
-  try {
-    const res = await axios.get("http://localhost:5000/api/medicines");
-    console.log("DIRECT FETCH DATA:", res.data);
-    setMedicines(res.data);
-    setFiltered(res.data);
-  } catch (error) {
-    console.error("DIRECT FETCH ERROR:", error);
-  } finally {
-    setLoading(false);
-  }
-};
+  const fetchMedicines = async () => {
+    try {
+      const res = await axios.get("http://localhost:5000/api/medicines");
+      setMedicines(res.data);
+      setFiltered(res.data);
+    } catch (error) {
+      console.error(error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleAddToCart = (medicineId: string) => {
-    alert("Cart system not implemented yet.");
+    const selectedMedicine = filtered.find((med) => med._id === medicineId);
+    if (!selectedMedicine) return;
+    setCart((prev) => [
+      ...prev,
+      {
+        ...selectedMedicine,
+        needsPrescription: selectedMedicine.requiresPrescription,
+      },
+    ]);
+  };
+
+  const handleCheckout = async () => {
+    if (cart.length === 0) {
+      alert("Your cart is empty");
+      return;
+    }
+
+    const requiresPrescription = cart.some((item) => item.needsPrescription);
+
+    if (requiresPrescription && !prescriptionFile) {
+      alert("Please upload prescription to continue.");
+      return;
+    }
+
+    try {
+      const formData = new FormData();
+
+      formData.append("items", JSON.stringify(cart));
+      formData.append(
+        "totalAmount",
+        cart.reduce((sum, item) => sum + item.price, 0).toString(),
+      );
+
+      if (prescriptionFile) {
+        formData.append("prescription", prescriptionFile);
+      }
+
+      const response = await axios.post(
+        "http://localhost:5000/api/orders/create",
+        formData,
+        {
+          headers: {
+            "Content-Type": "multipart/form-data",
+          },
+        },
+      );
+
+      if (response.data.success) {
+        alert("Order placed successfully!");
+        setCart([]);
+      }
+    } catch (error) {
+      console.error(error);
+      alert("Order failed");
+    }
   };
 
   return (
     <div className="min-h-screen bg-[#F8FAFC] pb-20 p-4 md:p-8">
       <div className="max-w-6xl mx-auto space-y-8">
-
-        {/* Header */}
+        {/* Back Button */}
         <div className="flex justify-between items-center">
           <button
             onClick={() => navigate("/")}
@@ -134,6 +187,56 @@ const fetchMedicines = async () => {
             )}
           </div>
         )}
+
+        {/* Cart Section */}
+        <div className="mt-10 p-6 bg-white rounded-2xl shadow border">
+          <h2 className="text-xl font-bold mb-4">Cart Items 🛒</h2>
+
+          {cart.length === 0 ? (
+            <p className="text-slate-500">No items in cart</p>
+          ) : (
+            <div>
+              {cart.map((item, index) => (
+                <div key={index} className="border-b py-2">
+                  <div className="flex justify-between">
+                    <span>{item.name}</span>
+                    <span>₹{item.price}</span>
+                  </div>
+                  {item.needsPrescription && (
+                    <p className="text-red-500 text-xs">
+                      Prescription required before checkout
+                    </p>
+                  )}
+                </div>
+              ))}
+
+              <div className="mt-4 font-semibold text-right">
+                Total: ₹{cart.reduce((sum, item) => sum + item.price, 0)}
+              </div>
+
+              {cart.some((item) => item.needsPrescription) && (
+                <div className="mt-4">
+                  <p className="text-sm font-medium">Upload Prescription</p>
+
+                  <input
+                    type="file"
+                    onChange={(e) =>
+                      setPrescriptionFile(e.target.files?.[0] || null)
+                    }
+                    className="border p-2 w-full mt-1"
+                  />
+                </div>
+              )}
+
+              <button
+                onClick={handleCheckout}
+                className="mt-4 w-full bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 transition-colors"
+              >
+                Proceed to Checkout
+              </button>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );

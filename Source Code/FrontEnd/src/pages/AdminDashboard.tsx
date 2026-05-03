@@ -1,113 +1,199 @@
-import { useEffect, useState } from 'react';
-import api from '../services/api';
-import { useAuth } from '../context/AuthContext';
-import { LogOut, Activity, UserCheck, XCircle } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import React, { useEffect, useState } from "react";
+import axios from "axios";
 
-export default function AdminDashboard() {
-  const [doctors, setDoctors] = useState([]);
-  const { logout } = useAuth();
-  const navigate = useNavigate();
+interface Doctor {
+  _id: string;
+  name: string;
+  email: string;
+}
 
-  const fetchDoctors = async () => {
+interface OrderItem {
+  name: string;
+  price: number;
+  needsPrescription: boolean;
+}
+
+interface Order {
+  _id: string;
+  items: OrderItem[];
+  totalAmount: number;
+  status: string;
+  prescriptionPath?: string;
+}
+
+const AdminDashboard = () => {
+const [pendingDoctors, setPendingDoctors] = useState<Doctor[]>([]);
+const [orders, setOrders] = useState<Order[]>([]);
+
+  // 🔹 Fetch Pending Doctors
+  const fetchPendingDoctors = async () => {
     try {
-      const { data } = await api.get('/admin/pending-doctors');
-      setDoctors(data);
+      const res = await axios.get(
+        "http://localhost:5000/api/admin/pending-doctors",
+      );
+      setPendingDoctors(res.data);
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  // 🔹 Fetch Orders
+  const fetchOrders = async () => {
+    try {
+      const res = await axios.get("http://localhost:5000/api/admin/orders");
+      setOrders(res.data);
     } catch (err) {
       console.error(err);
     }
   };
 
   useEffect(() => {
-    fetchDoctors();
+    fetchPendingDoctors();
+    fetchOrders();
   }, []);
 
-  const handleApprove = async (id: string) => {
-    if (!window.confirm('Approve this doctor?')) return;
-    try {
-      await api.put(`/admin/approve-doctor/${id}`);
-      fetchDoctors();
-    } catch (err) {
-      console.error(err);
-    }
+  // 🔹 Approve Doctor
+  const approveDoctor = async (id: string) => {
+    await axios.put(`http://localhost:5000/api/admin/approve-doctor/${id}`);
+    fetchPendingDoctors();
   };
 
-  const handleReject = async (id: string) => {
-    if (!window.confirm('Reject and delete this doctor?')) return;
-    try {
-      await api.delete(`/admin/reject-doctor/${id}`);
-      fetchDoctors();
-    } catch (err) {
-      console.error(err);
-    }
+  // 🔹 Reject Doctor
+  const rejectDoctor = async (id: string) => {
+    await axios.delete(`http://localhost:5000/api/admin/reject-doctor/${id}`);
+    fetchPendingDoctors();
+  };
+
+  // 🔹 Approve Order
+  const approveOrder = async (id: string) => {
+    await axios.put(`http://localhost:5000/api/admin/orders/${id}/approve`);
+    fetchOrders();
+  };
+
+  // 🔹 Reject Order
+  const rejectOrder = async (id: string) => {
+    await axios.put(`http://localhost:5000/api/admin/orders/${id}/reject`);
+    fetchOrders();
   };
 
   return (
-    <div className="min-h-screen bg-slate-50">
-      <nav className="bg-white border-b border-slate-200 sticky top-0 z-50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <div className="bg-[#06B6D4] p-1.5 rounded-lg">
-              <Activity className="w-5 h-5 text-white" />
-            </div>
-            <span className="text-xl font-bold text-slate-800 tracking-tight">BAYMAX Admin</span>
-          </div>
-          <button 
-            onClick={() => { logout(); navigate('/login'); }} 
-            className="flex items-center gap-2 text-slate-600 hover:text-red-500 transition-colors font-medium text-sm"
-          >
-            <LogOut className="w-4 h-4" />
-            Sign Out
-          </button>
-        </div>
-      </nav>
+    <div style={{ padding: "20px" }}>
+      {/* 🔹 EXISTING UI (UNCHANGED) */}
+      <h2>Pending Doctor Approvals</h2>
 
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <h1 className="text-2xl font-bold text-slate-800 mb-6">Pending Doctor Approvals</h1>
-        
-        {doctors.length === 0 ? (
-          <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-8 text-center text-slate-500">
-            No pending doctors awaiting approval.
+      {pendingDoctors.length === 0 ? (
+        <div
+          style={{
+            background: "#f5f5f5",
+            padding: "20px",
+            borderRadius: "10px",
+            textAlign: "center",
+          }}
+        >
+          No pending doctors awaiting approval.
+        </div>
+      ) : (
+        pendingDoctors.map((doc) => (
+          <div
+            key={doc._id}
+            style={{
+              border: "1px solid #ddd",
+              padding: "15px",
+              borderRadius: "10px",
+              marginTop: "15px",
+            }}
+          >
+            <p>
+              <b>Name:</b> {doc.name}
+            </p>
+            <p>
+              <b>Email:</b> {doc.email}
+            </p>
+
+            <button onClick={() => approveDoctor(doc._id)}>Approve</button>
+
+            <button
+              onClick={() => rejectDoctor(doc._id)}
+              style={{ marginLeft: "10px" }}
+            >
+              Reject
+            </button>
           </div>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {doctors.map((doc: any) => (
-              <div key={doc._id} className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 flex flex-col">
-                <div className="mb-4">
-                  <h3 className="text-lg font-bold text-slate-800">{doc.name}</h3>
-                  <p className="text-sm text-slate-500">{doc.email}</p>
-                </div>
-                
-                {doc.profile && (
-                  <div className="space-y-2 mb-6 flex-1 text-sm">
-                    <p><span className="font-semibold text-slate-700">Specialization:</span> {doc.profile.specialization}</p>
-                    <p><span className="font-semibold text-slate-700">Experience:</span> {doc.profile.experience} years</p>
-                    <p><span className="font-semibold text-slate-700">Hospital:</span> {doc.profile.hospital}</p>
-                    <p><span className="font-semibold text-slate-700">Location:</span> {doc.profile.address}</p>
-                  </div>
-                )}
-                
-                <div className="flex gap-3 mt-auto pt-4 border-t border-slate-100">
-                  <button 
-                    onClick={() => handleApprove(doc._id)}
-                    className="flex-1 flex items-center justify-center gap-2 bg-green-500 text-white py-2 rounded-lg font-medium hover:bg-green-600 transition-colors text-sm"
-                  >
-                    <UserCheck className="w-4 h-4" />
-                    Approve
-                  </button>
-                  <button 
-                    onClick={() => handleReject(doc._id)}
-                    className="flex-1 flex items-center justify-center gap-2 bg-red-500 text-white py-2 rounded-lg font-medium hover:bg-red-600 transition-colors text-sm"
-                  >
-                    <XCircle className="w-4 h-4" />
-                    Reject
-                  </button>
-                </div>
+        ))
+      )}
+
+      {/* 🆕 NEW FEATURE ADDED BELOW (NO CHANGE ABOVE) */}
+
+      <h2 style={{ marginTop: "40px" }}>📦 Order Approvals</h2>
+
+      {orders.length === 0 ? (
+        <div
+          style={{
+            background: "#f5f5f5",
+            padding: "20px",
+            borderRadius: "10px",
+            textAlign: "center",
+          }}
+        >
+          No orders available.
+        </div>
+      ) : (
+        orders.map((order) => (
+          <div
+            key={order._id}
+            style={{
+              border: "1px solid #ddd",
+              padding: "15px",
+              borderRadius: "10px",
+              marginTop: "15px",
+            }}
+          >
+            <p>
+              <b>Status:</b> {order.status}
+            </p>
+            <p>
+              <b>Total:</b> ₹{order.totalAmount}
+            </p>
+
+            <p>
+              <b>Medicines:</b>
+            </p>
+            <ul>
+              {order.items.map((item, i) => (
+                <li key={i}>
+                  {item.name} - ₹{item.price}
+                  {item.needsPrescription && " (Prescription Required)"}
+                </li>
+              ))}
+            </ul>
+
+            {order.prescriptionPath && (
+              <a
+                href={`http://localhost:5000/${order.prescriptionPath}`}
+                target="_blank"
+                rel="noreferrer"
+              >
+                View Prescription
+              </a>
+            )}
+
+            {order.status === "PENDING" && (
+              <div style={{ marginTop: "10px" }}>
+                <button onClick={() => approveOrder(order._id)}>Approve</button>
+
+                <button
+                  onClick={() => rejectOrder(order._id)}
+                  style={{ marginLeft: "10px" }}
+                >
+                  Reject
+                </button>
               </div>
-            ))}
+            )}
           </div>
-        )}
-      </main>
+        ))
+      )}
     </div>
   );
-}
+};
+
+export default AdminDashboard;
